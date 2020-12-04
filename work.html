@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>SPAlert widget</title>
+        <link href="https://fonts.googleapis.com/css2?family=Lobster&display=swap" rel="stylesheet">
+        <style>
+            #wallet {
+                font-family: 'Lobster', cursive;
+                font-size: 50pt;
+                color: orange;
+                opacity: 1;
+                transition: opacity 1s;
+            }
+        </style>
+    </head>
+    <body>
+        <script src="/socket.io/socket.io.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/cash/8.1.0/cash.min.js"></script>
+        <p id="wallet"></p>
+        <script>
+            function fade(element) {
+                var op = 1;  // initial opacity
+                var timer = setInterval(function () {
+                    if (op <= 0.1){
+                        clearInterval(timer);
+                        element.style.display = 'none';
+                    }
+                    element.style.opacity = op;
+                    element.style.filter = 'alpha(opacity=' + op * 100 + ")";
+                    op -= op * 0.1;
+                }, 50);
+            }
+            function fadeIn(el, time) {
+                el.style.opacity = 0;
+
+                var last = +new Date();
+                var tick = function() {
+                el.style.opacity = +el.style.opacity + (new Date() - last) / time;
+                last = +new Date();
+
+                if (+el.style.opacity < 1) {
+                    (window.requestAnimationFrame && requestAnimationFrame(tick)) || setTimeout(tick, 16);
+                }
+                };
+
+                tick();
+            }
+            const animateCSS = (element, animation, prefix = 'animate__') =>
+            // We create a Promise and return it
+            new Promise((resolve, reject) => {
+                const animationName = `${prefix}${animation}`;
+                const node = document.querySelector(element);
+
+                node.classList.add(`${prefix}animated`, animationName);
+
+                // When the animation ends, we clean the classes and resolve the Promise
+                function handleAnimationEnd() {
+                    node.classList.remove(`${prefix}animated`, animationName);
+                    resolve('Animation ended');
+                }
+
+                node.addEventListener('animationend', handleAnimationEnd, {once: true});
+            });
+            $(() => {
+                const socket = io();
+                let isFirst = true;
+                let previousDonats = [];
+                socket.on('wallet', async data => {
+                    document.querySelector('#wallet').innerText = `${data.name} (${data.value}АР): ${data.description}`;
+		    fadeIn(document.querySelector('#wallet'), 200)
+		    await new Promise((resolve) => {
+			setTimeout(() => fade(document.querySelector('#wallet'), 200), 5000)
+		    })
+                })
+          })
+        </script>
+    </body>
+</html>

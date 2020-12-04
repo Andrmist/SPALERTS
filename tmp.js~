@@ -1,0 +1,118 @@
+const puppeteer = require('puppeteer');
+const util = require('util');
+//const fetch = require('node-fetch')
+let browser, page;
+
+const {pay} = require('./test.js');
+
+async function getWallets(isCall, number) {
+    //await init();
+    await page.goto('https://spk.jakksoft.com/wallet');
+    console.log('goto');
+    //if (page.url == 'https://spk.jakksoft.com/login')
+    //    await page.goto('https://spk.jakksoft.com/wallet');
+
+    //await page.waitForNavigation();
+    //console.log('navi');
+    const label = 'label';
+    await page.waitForSelector(label);
+    await page.waitForSelector('tbody');
+
+    const moneys = await page.$$eval(label, labels => labels.map(elem => elem.textContent).filter(elem => elem.includes("АР") && !elem.includes("*")));
+    console.log(moneys);
+    let example = await page.$$eval(label, labels => labels.map( (elem, i) => {
+        //console.log(document.querySelectorAll('tbody'));
+        if (elem.parentElement.style.textAlign == 'right' && elem.textContent != 'Имя карты') {
+            return {
+                name: elem.textContent,
+                value: "",
+                history: []
+            };
+        } else return null;
+    }).filter(card => card != null));
+    console.log(example);
+    await page.waitForSelector('div[class=box]');
+    //for (let i in example) {
+        // let history = await page.$$eval('tbody', (tbody, i) => {
+        //     return Array.from(tbody[i].rows).map(row => {
+        //         return {
+        //             name: row.cells[2].innerText,
+        //             value: row.cells[0].innerText,
+        //             description: row.cells[1].innerText,
+        //             date: row.cells[3].innerText
+        //         };
+        //     });
+        // }, i);
+	let history = await page.evaluate(i => {
+	    return Array.from($($('div[class=box]')[i].children[0]).find(".col-lg-12")).map(elem => {
+            return {
+                name: $($(elem).children().children()[2]).children().children().attr('data-original-title') == undefined ? $($(elem).children().children()[2]).children().attr('data-original-title') : $($(elem).children().children()[2]).children().children().attr('data-original-title'),
+                value: $(elem).children().children()[0].innerText.trim(),
+                description: $(elem).children().children()[1].innerText.trim()
+            };
+	    });
+	}, number);
+        example[number].history = history;
+        example[number].value = moneys[number];
+    //}
+    //'value: ' + elem.textContent + ', parent: ' + elem.parentElement.tagName)
+    console.log('getting');
+    //console.log(example[0].history);
+
+    // example.map(elem => {console.log('textContent: ' + elem.textContent + '\n parent:' + elem.parentElement);});
+
+    //await page.screenshot({path: 'example.png'});
+    if (!isCall)
+        page.close();
+    return example[number];
+};
+
+async function init () {
+    //{headless: false});
+    browser = await puppeteer.launch({headless: false, args: []});//{headless:false});
+    // console.log(browser);
+    // let context = await browser.createIncognitoBrowserContext();
+    page = await browser.newPage();
+    await page.setViewport({width: 1500, height: 1000});
+    page.setCookie({name: 'PHPSESSID', value: '10c063d5780089d492613bbcd1d896bf', domain: 'spk.jakksoft.com'});
+    //await page.goto('https://spk.jakksoft.com');
+    // await page.screenshot({path: 'buddy-screenshot.png'});
+    // console.time('a');
+    // console.log(util.inspect(await getWallets(true, 1), false, null, true /* enable colors */));
+    // console.timeEnd('a');
+    // console.time('b');
+    // console.log(util.inspect(await getWallets(true, 1), false, null, true /* enable colors */));
+    // console.timeEnd('b'); 
+}
+const app = require('express')();
+const http = require('http').createServer(app);
+const io = require('socket.io')(http);
+app.get('/', async (req, res) => {
+    res.sendFile(__dirname + '/work.html');
+});
+let timer;
+io.on('connection', async socket => {
+    console.log('user connected');
+    socket.join('widget');
+});
+
+timer = setInterval(async () => {
+    let numClients;
+    await io.of('/').in('widget').clients((error,clients) => {
+        
+        numClients=clients.length;
+    });
+    // console.log(numClients)
+    if (numClients > 0 ) {
+        let wallets = await getWallets(true, 1);
+        io.to('widget').emit('wallet', wallets);
+    }
+}, 2000);
+
+
+
+http.listen(3000, async () => {
+    await init();
+    console.log('listening on *:3000');
+});
+
